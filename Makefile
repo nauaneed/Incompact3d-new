@@ -39,13 +39,20 @@ endif
 MODDIR = ./mod
 DECOMPDIR = ./decomp2d
 SRCDIR = ./src
+OBJDIR = ./obj
+NEWDIRS = $(OBJDIR) $(MODDIR)
 
 ### List of files for the main code
-SRCDECOMP = $(DECOMPDIR)/decomp_2d.f90 $(DECOMPDIR)/glassman.f90 $(DECOMPDIR)/fft_$(FFT).f90 $(DECOMPDIR)/io.f90
-OBJDECOMP = $(SRCDECOMP:%.f90=%.o)
-SRC = $(SRCDIR)/module_param.f90 $(SRCDIR)/variables.f90 $(SRCDIR)/poisson.f90 $(SRCDIR)/derive.f90 $(SRCDIR)/schemes.f90 $(SRCDIR)/implicit.f90 $(SRCDIR)/parameters.f90 $(SRCDIR)/*.f90
-OBJ = $(SRC:%.f90=%.o)
-SRC = $(SRCDIR)/module_param.f90 $(SRCDIR)/variables.f90 $(SRCDIR)/poisson.f90 $(SRCDIR)/derive.f90 $(SRCDIR)/schemes.f90 $(SRCDIR)/implicit.f90 $(SRCDIR)/forces.f90 $(SRCDIR)/BC-User.f90 $(SRCDIR)/BC-TGV.f90 $(SRCDIR)/BC-Channel-flow.f90 $(SRCDIR)/BC-TBL.f90 $(SRCDIR)/BC-Cylinder.f90 $(SRCDIR)/BC-Lock-exchange.f90 $(SRCDIR)/BC-Mixing-layer.f90 $(SRCDIR)/BC-dbg-schemes.f90 $(SRCDIR)/case.f90 $(SRCDIR)/les_models.f90 $(SRCDIR)/transeq.f90 $(SRCDIR)/navier.f90 $(SRCDIR)/time_integrators.f90 $(SRCDIR)/filters.f90 $(SRCDIR)/parameters.f90 $(SRCDIR)/tools.f90 $(SRCDIR)/statistics.f90 $(SRCDIR)/visu.f90 $(SRCDIR)/genepsi3d.f90 $(SRCDIR)/xcompact3d.f90
+DECOMPS = decomp_2d.f90 glassman.f90 fft_$(FFT).f90 io.f90
+SRCDECOMP = $(addprefix $(DECOMPDIR)/, $(DECOMPS))
+OBJDECOMP = $(SRCDECOMP:$(DECOMPDIR)/%.f90=$(OBJDIR)/%.o)
+
+SRCS= module_param.f90 variables.f90 poisson.f90 derive.f90 schemes.f90 implicit.f90 parameters.f90 *.f90
+SRCSRC = $(addprefix $(SRCDIR)/, $(SRCS))
+OBJOBJ = $(SRCSRC:$(SRCDIR)/%.f90=$(OBJDIR)/%.o)
+
+SRCS = module_param.f90 variables.f90 poisson.f90 derive.f90 schemes.f90 implicit.f90 forces.f90 BC-User.f90 BC-TGV.f90 BC-Channel-flow.f90 BC-TBL.f90 BC-Cylinder.f90 BC-Lock-exchange.f90 BC-Mixing-layer.f90 BC-dbg-schemes.f90 case.f90 les_models.f90 transeq.f90 navier.f90 time_integrators.f90 filters.f90 parameters.f90 tools.f90 statistics.f90 visu.f90 genepsi3d.f90 xcompact3d.f90
+SRCSRC = $(addprefix $(SRCDIR)/, $(SRCS))
 
 ### List of files for the post-processing code
 PSRC = decomp_2d.f90 module_param.f90 io.f90 variables.f90 schemes.f90 derive.f90 BC-$(FLOW_TYPE).f90 parameters.f90 tools.f90 visu.f90 post.f90
@@ -76,32 +83,31 @@ LINKOPT = $(FFLAGS)
 
 all: xcompact3d
 
-xcompact3d : $(OBJDECOMP) $(OBJ)
+xcompact3d : $(NEWDIRS) $(OBJDECOMP) $(OBJ)
 	$(FC) -o $@ $(LINKOPT) $(OBJDECOMP) $(OBJ) $(LIBFFT)
 
-$(OBJDECOMP):$(DECOMPDIR)%.o : $(DECOMPDIR)%.f90
-	$(FC) $(FFLAGS) $(OPT) $(DEFS) $(DEFS2) $(INC) -c $<
-	mv $(@F) ${DECOMPDIR}
-	#mv *.mod ${DECOMPDIR}
+$(NEWDIRS) :
+	mkdir -p $(NEWDIRS)
 
+$(OBJDECOMP) : $(OBJDIR)%.o : $(DECOMPDIR)%.f90
+	$(FC) $(FFLAGS) $(OPT) $(DEFS) $(DEFS2) $(INC) -c $< -o $@ -J $(MODDIR)
 
-$(OBJ):$(SRCDIR)%.o : $(SRCDIR)%.f90
-	$(FC) $(FFLAGS) $(OPT) $(DEFS) $(DEFS2) $(INC) -c $<
-	mv $(@F) ${SRCDIR}
-	#mv *.mod ${SRCDIR}
+$(OBJOBJ) : $(OBJDIR)%.o : $(SRCDIR)%.f90
+	$(FC) $(FFLAGS) $(OPT) $(DEFS) $(DEFS2) $(INC) -c $< -o $@ -J $(MODDIR)
 
 ## This %.o : %.f90 doesn't appear to be called...
 %.o : %.f90
 	$(FC) $(FFLAGS) $(DEFS) $(DEFS2) $(INC) -c $<
 
+#todo .phony:post
 .PHONY: clean
 
-
 clean:
-	rm -f $(DECOMPDIR)/*.o $(DECOMPDIR)/*.mod
-	rm -f $(SRCDIR)/*.o $(SRCDIR)/*.mod
 	rm -f *.o *.mod xcompact3d post
+	rm -f $(MODDIR)/*
+	rm -f $(OBJDIR)/*
 
 .PHONY: cleanall
+
 cleanall: clean
 	rm -f *~ \#*\# out/* data/* stats/* planes/* *.xdmf *.log *.out nodefile core sauve*
